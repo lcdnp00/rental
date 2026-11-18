@@ -20,7 +20,7 @@ class CarTest {
         car = new Car("ABC123", "Toyota");
     }
 
-    // ============ Constructor ============
+    //  ============ Constructor ============
 
     @Test
     @DisplayName("Should create a car with correct attributes")
