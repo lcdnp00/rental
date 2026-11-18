@@ -26,7 +26,7 @@ class CarTest {
     @DisplayName("Should create a car with correct attributes")
     void testCarConstructor() {
         assertEquals("ABC123", car.getPlate());
-        assertEquals("Toyot", car.getBrand());
+        assertEquals("Toyota", car.getBrand());
         assertFalse(car.isRented());
     }
 

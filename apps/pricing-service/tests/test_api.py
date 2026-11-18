@@ -17,7 +17,7 @@ def test_creates_a_quote() -> None:
 
     assert response.status_code == 200
     assert response.json() == {
-        "category": "econom",
+        "category": "economy",
         "days": 4,
         "daily_rate": 40.0,
         "total": 160.0,
