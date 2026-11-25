@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -60,10 +61,60 @@ def lint() -> None:
     lint_java()
     lint_python()
 
+FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
+IMAGE_DIGEST = re.compile(r"@sha256:[0-9a-f]{64}$")
+USES_LINE = re.compile(r"^\s*(?:-\s*)?uses:\s*([^\s#]+)")
+FROM_LINE = re.compile(r"^\s*FROM\s+(?:--\S+\s+)*(\S+)(?:\s+AS\s+(\S+))?", re.IGNORECASE)
+
+
+def workflow_violations() -> list[str]:
+    violations = []
+    for workflow in sorted((ROOT / ".github" / "workflows").glob("*.y*ml")):
+        for number, line in enumerate(workflow.read_text().splitlines(), start=1):
+            match = USES_LINE.match(line)
+            if not match:
+                continue
+            reference = match.group(1)
+            if reference.startswith("./"):
+                continue  # action locale au dépôt : rien à épingler
+            _, _, version = reference.partition("@")
+            if not FULL_SHA.fullmatch(version):
+                where = workflow.relative_to(ROOT)
+                violations.append(f"{where}:{number} action non épinglée par SHA: {reference}")
+    return violations
+
+
+def dockerfile_violations() -> list[str]:
+    violations = []
+    for dockerfile in sorted((ROOT / "apps").rglob("Dockerfile*")):
+        stages: set[str] = set()
+        for number, line in enumerate(dockerfile.read_text().splitlines(), start=1):
+            match = FROM_LINE.match(line)
+            if not match:
+                continue
+            image, alias = match.groups()
+            internal = image.lower() == "scratch" or image in stages
+            if alias:
+                stages.add(alias)
+            if not internal and not IMAGE_DIGEST.search(image):
+                where = dockerfile.relative_to(ROOT)
+                violations.append(f"{where}:{number} image de base sans digest sha256: {image}")
+    return violations
+
+
+def supply_chain_policy() -> None:
+    violations = [*workflow_violations(), *dockerfile_violations()]
+    for violation in violations:
+        print(f"VIOLATION {violation}", file=sys.stderr)
+    if violations:
+        raise RuntimeError(f"{len(violations)} référence(s) mutable(s) détectée(s)")
+    print("OK supply-chain policy")
+
 
 def verify() -> None:
     test()
     lint()
+    supply_chain_policy()
 
 
 def compose_up() -> None:
@@ -147,6 +198,7 @@ def main() -> int:
             "lint-java",
             "lint-python",
             "verify",
+            "supply-chain-policy",
             "compose-up",
             "compose-down",
             "smoke",
@@ -163,6 +215,7 @@ def main() -> int:
         "lint-java": lint_java,
         "lint-python": lint_python,
         "verify": verify,
+        "supply-chain-policy": supply_chain_policy,
         "compose-up": compose_up,
         "compose-down": compose_down,
         "smoke": smoke,
