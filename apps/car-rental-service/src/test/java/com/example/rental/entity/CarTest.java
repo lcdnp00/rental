@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
  * Tests for Car Entity
  * Tests the data model and its behavior
  */
+
 @DisplayName("Car Entity Tests")
 class CarTest {
 
